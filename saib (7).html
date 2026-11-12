@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Saib</title>
+<style>
+  body{margin:0;background:#fff;font-family:Arial,sans-serif;color:#0f6b5f;display:flex;flex-direction:column;align-items:center;padding:24px 16px}
+  .logo{width:300px;max-width:85%;margin:8px 0 22px;direction:ltr}
+  .box{width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px}
+  textarea{width:100%;height:200px;box-sizing:border-box;border:2px solid #0f6b5f;border-radius:12px;padding:10px;font-family:monospace;font-size:14px;direction:ltr;text-align:left;white-space:pre;overflow:auto}
+  button,label.btn{background:#0f6b5f;color:#fff;border:0;border-radius:12px;padding:12px;font-size:16px;font-weight:bold;text-align:center;cursor:pointer}
+  .orange{background:#c8581f}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  input[type=file]{display:none}
+  #msg{text-align:center;min-height:20px;font-size:14px}
+  #list{display:flex;flex-direction:column;gap:6px}
+  #list div{border:1px solid #0f6b5f;border-radius:10px;padding:8px 10px;cursor:pointer;direction:ltr;text-align:left;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<svg class="logo" viewBox="0 0 1120 360" xmlns="http://www.w3.org/2000/svg">
+  <path d="M205 47 H70 A42 42 0 0 0 28 89 V289 A42 42 0 0 0 70 331 H262 A42 42 0 0 0 304 289 V145"
+        fill="none" stroke="#0f6b5f" stroke-width="40"/>
+  <path d="M217 34 L318 133 H252 Q217 133 217 98 Z" fill="#c8581f"/>
+  <rect x="78" y="158" width="172" height="36" rx="18" fill="#0f6b5f"/>
+  <rect x="78" y="226" width="172" height="36" rx="18" fill="#0f6b5f"/>
+  <text x="375" y="312" font-family="Montserrat,Arial Black,Arial,sans-serif" font-weight="800"
+        font-size="355" fill="#0f6b5f" textLength="733" lengthAdjust="spacingAndGlyphs">Saib</text>
+</svg>
+
+<div class="box">
+  <label class="btn" for="f">ارفع الملف</label>
+  <input type="file" id="f">
+  <textarea id="t" placeholder="أو الصق هنا"></textarea>
+  <button id="raw">رفع خام</button>
+  <div class="row">
+    <button id="open" class="orange">فتح</button>
+    <button id="copy" class="orange">نسخ</button>
+  </div>
+  <div id="msg"></div>
+  <div id="list"></div>
+</div>
+
+<script>
+const DB='https://conserol-default-rtdb.firebaseio.com/saib';
+const t=document.getElementById('t'),f=document.getElementById('f'),m=document.getElementById('msg'),list=document.getElementById('list');
+let name='بدون اسم';
+const say=s=>{m.textContent=s;setTimeout(()=>m.textContent='',2500)};
+
+// اختيار ملف: يقرأه نص خام كما هو
+f.onchange=()=>{
+  const file=f.files[0]; if(!file) return;
+  name=file.name;
+  const r=new FileReader();
+  r.onload=()=>{t.value=r.result;say('تم قراءة الملف، اضغط رفع خام')};
+  r.readAsText(file);
+};
+
+// رفع خام: يحفظ النص في قاعدة البيانات
+document.getElementById('raw').onclick=async()=>{
+  if(!t.value){say('ما فيه شيء للرفع');return}
+  try{
+    const res=await fetch(DB+'.json',{method:'POST',body:JSON.stringify({name:name,content:t.value,time:Date.now()})});
+    if(!res.ok) throw new Error(res.status);
+    say('تم الرفع الخام');
+    load();
+  }catch(e){say('فشل الرفع: '+e.message+' (تأكد من قواعد القاعدة)')}
+};
+
+// عرض المحفوظات
+async function load(){
+  try{
+    const res=await fetch(DB+'.json?orderBy="$key"&limitToLast=20');
+    const d=await res.json();
+    list.innerHTML='';
+    if(!d||d.error) return;
+    Object.keys(d).reverse().forEach(k=>{
+      const el=document.createElement('div');
+      el.textContent=d[k].name+' — '+d[k].content.slice(0,40);
+      el.onclick=()=>{t.value=d[k].content;name=d[k].name};
+      list.appendChild(el);
+    });
+  }catch(e){}
+}
+load();
+
+// فتح: النص الخام في تبويب جديد
+document.getElementById('open').onclick=()=>{
+  const url=URL.createObjectURL(new Blob([t.value],{type:'text/plain;charset=utf-8'}));
+  window.open(url,'_blank');
+};
+
+// نسخ
+document.getElementById('copy').onclick=async()=>{
+  try{await navigator.clipboard.writeText(t.value);say('تم النسخ')}
+  catch(e){t.select();document.execCommand('copy');say('تم النسخ')}
+};
+</script>
+</body>
+</html>
